@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speech Transcription</title>
+    <script src="https://www.webrtc-experiment.com/RecordRTC.js"></script>
+    <style>
+      :root {
+        --bg-color: #0f172a;
+        --card-bg: #1e293b;
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --danger: #ef4444;
+        --danger-hover: #dc2626;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --border: #334155;
+        --accent: #10b981;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg-color);
+        color: var(--text);
+        line-height: 1.5;
+        display: flex;
+        justify-content: center;
+        padding: 2rem;
+        min-height: 100vh;
+      }
+      .app-container {
+        width: 100%;
+        max-width: 800px;
+        background: var(--card-bg);
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .header {
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+        background: linear-gradient(to right, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 2rem;
+        background: rgba(15, 23, 42, 0.4);
+        border-bottom: 1px solid var(--border);
+      }
+      button {
+        padding: 0.6rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      button:hover {
+        background: var(--primary-hover);
+        transform: translateY(-1px);
+      }
+      button.recording {
+        background: var(--danger);
+        animation: pulse 2s infinite;
+      }
+      button.recording:hover {
+        background: var(--danger-hover);
+      }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+      }
+      .loading {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        color: var(--accent);
+        font-size: 0.95rem;
+      }
+      .loading.visible {
+        display: inline-flex;
+      }
+      .progress-wrapper {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        flex-grow: 1;
+        max-width: 300px;
+      }
+      progress {
+        flex-grow: 1;
+        height: 8px;
+        border-radius: 4px;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+      progress::-webkit-progress-bar {
+        background-color: var(--border);
+        border-radius: 4px;
+      }
+      progress::-webkit-progress-value {
+        background-color: var(--accent);
+        border-radius: 4px;
+        transition: width 0.1s linear;
+      }
+      #countdownText {
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: bold;
+        min-width: 25px;
+        font-family: monospace;
+      }
+      .font-size-control {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-left: auto;
+      }
+      .font-size-control input[type="range"] {
+        width: 100px;
+        accent-color: var(--primary);
+      }
+      .font-size-value {
+        min-width: 35px;
+        color: var(--text);
+        font-weight: 500;
+      }
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .status {
+        color: #fca5a5;
+        padding: 0 2rem;
+        font-size: 0.9rem;
+        min-height: 0;
+      }
+      .status:not(:empty) {
+        padding-top: 1rem;
+        min-height: 24px;
+      }
+      #transcript {
+        flex-grow: 1;
+        padding: 2rem;
+        overflow-y: auto;
+        line-height: 1.7;
+        font-size: 1.2rem;
+        height: 500px;
+        scroll-behavior: smooth;
+      }
+      #transcript p {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 8px;
+        border-left: 3px solid var(--primary);
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--card-bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+
+      /* Responsive Mobile UI */
+      @media (max-width: 640px) {
+        body {
+          padding: 0;
+        }
+        .app-container {
+          border-radius: 0;
+          height: 100vh;
+          max-height: 100vh;
+        }
+        .header {
+          padding: 1rem;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+          padding: 1rem;
+          gap: 1rem;
+        }
+        button {
+          width: 100%;
+          justify-content: center;
+        }
+        .progress-wrapper {
+          max-width: 100%;
+        }
+        .font-size-control {
+          margin-left: 0;
+          justify-content: space-between;
+        }
+        .font-size-control input[type="range"] {
+          width: auto;
+          flex-grow: 1;
+          margin: 0 15px;
+        }
+        #transcript {
+          padding: 1rem;
+          height: auto;
+          flex-grow: 1;
+        }
+        .status {
+          padding: 0 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <div class="header">
+        <h2>🎙️ Speech Transcription</h2>
+        <div id="loading" class="loading" aria-live="polite">
+          <span class="spinner"></span>
+          <span id="loadingText">Loading...</span>
+        </div>
+      </div>
+      
+      <div class="toolbar">
+        <button id="btnStart">🎤 Bắt đầu nghe</button>
+        
+        <div id="progressWrapper" class="progress-wrapper">
+          <progress id="chunkProgress" value="0" max="8000"></progress>
+          <span id="countdownText">8s</span>
+        </div>
+
+        <div class="font-size-control">
+          <label for="fontSizeRange">Cỡ chữ:</label>
+          <input
+            id="fontSizeRange"
+            type="range"
+            min="14"
+            max="36"
+            step="1"
+            value="19"
+          />
+          <span id="fontSizeValue" class="font-size-value">19px</span>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="transcript"></div>
+    </div>
+
+    <script>
+      const btnStart = document.getElementById("btnStart");
+      const transcriptDiv = document.getElementById("transcript");
+      const statusDiv = document.getElementById("status");
+      const loadingDiv = document.getElementById("loading");
+      const loadingText = document.getElementById("loadingText");
+      const fontSizeRange = document.getElementById("fontSizeRange");
+      const fontSizeValue = document.getElementById("fontSizeValue");
+      const progressWrapper = document.getElementById("progressWrapper");
+      const chunkProgress = document.getElementById("chunkProgress");
+      const countdownText = document.getElementById("countdownText");
+      const API_KEY =
+        "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";
+      const FONT_SIZE_STORAGE_KEY = "stt_transcript_font_size";
+
+      let recorder;
+      let micStream;
+      let isListening = false;
+      let audioContext;
+      let analyserNode;
+      let sourceNode;
+      let vadFrameId;
+      let hasSpeechInCurrentSlice = false;
+      let progressInterval;
+      let chunkStartTime = 0;
+
+      const VAD_THRESHOLD = 0.02;
+      const VAD_MIN_CONSECUTIVE_FRAMES = 3;
+
+      initFontSizeControl();
+      setupKeyboardShortcuts();
+
+      btnStart.onclick = toggleListening;
+
+      async function toggleListening() {
+        if (isListening) {
+          stopListening();
+          return;
+        }
+
+        try {
+          if (
+            !window.isSecureContext &&
+            location.hostname !== "localhost" &&
+            location.hostname !== "127.0.0.1"
+          ) {
+            setLoading(false);
+            statusDiv.innerText =
+              "iPad/Safari chỉ cho phép micro trên HTTPS (hoặc localhost).";
+            return;
+          }
+
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setLoading(false);
+            statusDiv.innerText =
+              "Trình duyệt không hỗ trợ getUserMedia (hãy dùng Safari bản mới).";
+            return;
+          }
+
+          setLoading(true, "Loading microphone...");
+          statusDiv.innerText = "";
+
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+
+          await setupVoiceActivityDetection(micStream);
+
+          // Dùng RecordRTC để tự động cắt file mỗi 8 giây (để tối ưu quota 10s của Groq)
+          recorder = new RecordRTC(micStream, {
+            type: "audio",
+            mimeType: "audio/wav",
+            recorderType: StereoAudioRecorder,
+            timeSlice: 8000, // Cắt mỗi 8 giây gửi 1 lần cho rảnh tay
+            ondataavailable: async (blob) => {
+              resetProgressTimer();
+              const shouldSend = hasSpeechInCurrentSlice;
+              hasSpeechInCurrentSlice = false;
+
+              if (!shouldSend) {
+                console.log("Bo qua chunk im lang");
+                return;
+              }
+
+              sendToGroq(blob);
+            },
+          });
+
+          recorder.startRecording();
+          isListening = true;
+          setLoading(true, "Listening...");
+          btnStart.innerText = "🛑 Dừng nghe";
+          btnStart.classList.add("recording");
+          
+          startProgressTimer();
+        } catch (err) {
+          console.error("Không bật được micro:", err);
+
+          stopListening(true);
+
+          if (err && err.name === "NotAllowedError") {
+            statusDiv.innerText =
+              "Bạn đã chặn micro. Vào Settings > Safari > Microphone để cho phép rồi thử lại.";
+            return;
+          }
+
+          if (err && err.name === "NotFoundError") {
+            statusDiv.innerText = "Không tìm thấy micro trên thiết bị.";
+            return;
+          }
+
+          statusDiv.innerText =
+            "Không thể mở micro trên iPad. Kiểm tra quyền micro, HTTPS và thử reload trang.";
+        }
+      }
+
+      function stopListening(skipStatusText = false) {
+        if (recorder) {
+          try {
+            if (recorder.getState && recorder.getState() === "recording") {
+              recorder.stopRecording(() => {});
+            }
+          } catch (err) {
+            console.error("Lỗi khi dừng recorder:", err);
+          }
+          recorder = null;
+        }
+
+        if (micStream) {
+          micStream.getTracks().forEach((track) => track.stop());
+          micStream = null;
+        }
+
+        stopVoiceActivityDetection();
+        stopProgressTimer();
+
+        isListening = false;
+        btnStart.innerText = "🎤 Bắt đầu nghe";
+        btnStart.classList.remove("recording");
+        setLoading(false);
+
+        if (!skipStatusText) {
+          statusDiv.innerText = "";
+        }
+      }
+
+      function setLoading(show, text = "Loading...") {
+        if (show) {
+          loadingText.innerText = text;
+          loadingDiv.classList.add("visible");
+          return;
+        }
+
+        loadingDiv.classList.remove("visible");
+      }
+
+      function initFontSizeControl() {
+        const savedFontSize = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+        const initialFontSize =
+          Number(savedFontSize) || Number(fontSizeRange.value);
+        applyTranscriptFontSize(initialFontSize);
+
+        fontSizeRange.addEventListener("input", (event) => {
+          const value = Number(event.target.value);
+          applyTranscriptFontSize(value);
+          localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(value));
+        });
+      }
+
+      function setupKeyboardShortcuts() {
+        document.addEventListener("keydown", (event) => {
+          const isSpaceKey = event.code === "Space" || event.key === " ";
+          if (!isSpaceKey || event.repeat) {
+            return;
+          }
+
+          const activeEl = document.activeElement;
+          const isTypingTarget =
+            activeEl &&
+            (activeEl.tagName === "INPUT" ||
+              activeEl.tagName === "TEXTAREA" ||
+              activeEl.tagName === "SELECT" ||
+              activeEl.isContentEditable);
+
+          if (isTypingTarget) {
+            return;
+          }
+
+          event.preventDefault();
+          toggleListening();
+        });
+      }
+
+      function applyTranscriptFontSize(sizePx) {
+        const clampedSize = Math.min(36, Math.max(14, sizePx));
+        transcriptDiv.style.fontSize = `${clampedSize}px`;
+        fontSizeRange.value = String(clampedSize);
+        fontSizeValue.innerText = `${clampedSize}px`;
+      }
+
+      async function setupVoiceActivityDetection(stream) {
+        const AudioContextClass =
+          window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          throw new Error("Web Audio API is not supported");
+        }
+
+        audioContext = new AudioContextClass();
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        sourceNode = audioContext.createMediaStreamSource(stream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 2048;
+        analyserNode.smoothingTimeConstant = 0.2;
+        sourceNode.connect(analyserNode);
+
+        const timeData = new Float32Array(analyserNode.fftSize);
+        let consecutiveSpeechFrames = 0;
+
+        const tick = () => {
+          if (!analyserNode) {
+            return;
+          }
+
+          analyserNode.getFloatTimeDomainData(timeData);
+
+          let sumSquares = 0;
+          for (let i = 0; i < timeData.length; i += 1) {
+            const sample = timeData[i];
+            sumSquares += sample * sample;
+          }
+
+          const rms = Math.sqrt(sumSquares / timeData.length);
+
+          if (rms >= VAD_THRESHOLD) {
+            consecutiveSpeechFrames += 1;
+            if (consecutiveSpeechFrames >= VAD_MIN_CONSECUTIVE_FRAMES) {
+              hasSpeechInCurrentSlice = true;
+            }
+          } else {
+            consecutiveSpeechFrames = 0;
+          }
+
+          vadFrameId = requestAnimationFrame(tick);
+        };
+
+        hasSpeechInCurrentSlice = false;
+        vadFrameId = requestAnimationFrame(tick);
+      }
+
+      function stopVoiceActivityDetection() {
+        if (vadFrameId) {
+          cancelAnimationFrame(vadFrameId);
+          vadFrameId = null;
+        }
+
+        if (sourceNode) {
+          sourceNode.disconnect();
+          sourceNode = null;
+        }
+
+        if (analyserNode) {
+          analyserNode.disconnect();
+          analyserNode = null;
+        }
+
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+
+        hasSpeechInCurrentSlice = false;
+      }
+
+      function startProgressTimer() {
+        progressWrapper.style.display = "flex";
+        chunkStartTime = Date.now();
+        progressInterval = setInterval(updateProgress, 50);
+      }
+
+      function updateProgress() {
+        const elapsed = Date.now() - chunkStartTime;
+        if (elapsed > 8000) {
+          chunkProgress.value = 8000;
+        } else {
+          chunkProgress.value = elapsed;
+          const remainingSec = Math.ceil((8000 - elapsed) / 1000);
+          countdownText.innerText = `${remainingSec}s`;
+        }
+      }
+
+      function resetProgressTimer() {
+        chunkStartTime = Date.now();
+        updateProgress();
+      }
+
+      function stopProgressTimer() {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        progressWrapper.style.display = "none";
+        chunkProgress.value = 0;
+        countdownText.innerText = "8s";
+      }
+
+      let previousTranscript = ""; // Lưu lại ngữ cảnh text của đoạn trước đó
+
+      async function sendToGroq(audioBlob) {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "speech.wav");
+        formData.append("model", "whisper-large-v3");
+        formData.append("language", "vi");
+        
+        // Nối thêm text vừa nói ở đoạn trước vào prompt để AI giữ ngữ cảnh
+        const basePrompt = "Bài giảng nhiếp ảnh";
+        const fullPrompt = previousTranscript ? basePrompt + " " + previousTranscript : basePrompt;
+        formData.append("prompt", fullPrompt);
+
+        try {
+          const response = await fetch(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${API_KEY}` },
+              body: formData,
+            },
+          );
+          const data = await response.json();
+
+          if (data.text) {
+            const junkWords = [
+              "subscribe",
+              "lala school",
+              "cảm ơn các bạn",
+              "theo dõi",
+              "video",
+            ];
+            const isJunk = junkWords.some((word) =>
+              data.text.toLowerCase().includes(word),
+            );
+
+            if (data.text && !isJunk && data.text.length > 2) {
+              const p = document.createElement("p");
+              p.innerText = "➤ " + data.text;
+              transcriptDiv.appendChild(p);
+              transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+              
+              // Cập nhật lại previousTranscript cho chunk tiếp theo (giữ khoảng 200 ký tự cuối)
+              previousTranscript = data.text.slice(-200);
+            } else {
+              console.log("Bỏ qua câu rác:", data.text);
+            }
+          }
+        } catch (err) {
+          console.error("Lỗi rồi bồ ơi:", err);
+        }
+      }
+    </script>
+  </body>
+</html>
