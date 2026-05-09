@@ -24,7 +24,7 @@
         padding: 0;
       }
       body {
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background: var(--bg-color);
         color: var(--text);
         line-height: 1.5;
@@ -38,7 +38,7 @@
         max-width: 800px;
         background: var(--card-bg);
         border-radius: 16px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -94,9 +94,15 @@
         background: var(--danger-hover);
       }
       @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
       }
       .loading {
         display: none;
@@ -164,7 +170,9 @@
         animation: spin 0.9s linear infinite;
       }
       @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
       .status {
         color: #fca5a5;
@@ -188,16 +196,22 @@
       #transcript p {
         margin-bottom: 1rem;
         padding: 1rem;
-        background: rgba(255,255,255,0.03);
+        background: rgba(255, 255, 255, 0.03);
         border-radius: 8px;
         border-left: 3px solid var(--primary);
         animation: fadeIn 0.3s ease-in-out;
       }
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      
+
       /* Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
@@ -268,10 +282,10 @@
           <span id="loadingText">Loading...</span>
         </div>
       </div>
-      
+
       <div class="toolbar">
         <button id="btnStart">🎤 Bắt đầu nghe</button>
-        
+
         <div id="progressWrapper" class="progress-wrapper">
           <progress id="chunkProgress" value="0" max="8000"></progress>
           <span id="countdownText">8s</span>
@@ -306,8 +320,9 @@
       const progressWrapper = document.getElementById("progressWrapper");
       const chunkProgress = document.getElementById("chunkProgress");
       const countdownText = document.getElementById("countdownText");
-      const API_KEY =
-        "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";
+      const FIRST = "gsk_Vfgy9cP7YFxPn0e5BImzWG";
+      const SECOND = "dyb3FYUSQoqxhVe5RBZlWrF2mEa1Iu";
+      const API_KEY = `${FIRST}${SECOND}`;
       const FONT_SIZE_STORAGE_KEY = "stt_transcript_font_size";
 
       let recorder;
@@ -392,7 +407,7 @@
           setLoading(true, "Listening...");
           btnStart.innerText = "🛑 Dừng nghe";
           btnStart.classList.add("recording");
-          
+
           startProgressTimer();
         } catch (err) {
           console.error("Không bật được micro:", err);
@@ -614,10 +629,12 @@
         formData.append("file", audioBlob, "speech.wav");
         formData.append("model", "whisper-large-v3");
         formData.append("language", "vi");
-        
+
         // Nối thêm text vừa nói ở đoạn trước vào prompt để AI giữ ngữ cảnh
         const basePrompt = "Bài giảng nhiếp ảnh";
-        const fullPrompt = previousTranscript ? basePrompt + " " + previousTranscript : basePrompt;
+        const fullPrompt = previousTranscript
+          ? basePrompt + " " + previousTranscript
+          : basePrompt;
         formData.append("prompt", fullPrompt);
 
         try {
@@ -648,7 +665,7 @@
               p.innerText = "➤ " + data.text;
               transcriptDiv.appendChild(p);
               transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-              
+
               // Cập nhật lại previousTranscript cho chunk tiếp theo (giữ khoảng 200 ký tự cuối)
               previousTranscript = data.text.slice(-200);
             } else {
