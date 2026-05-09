@@ -24,7 +24,7 @@
         padding: 0;
       }
       body {
-        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         background: var(--bg-color);
         color: var(--text);
         line-height: 1.5;
@@ -38,7 +38,7 @@
         max-width: 800px;
         background: var(--card-bg);
         border-radius: 16px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -57,6 +57,7 @@
         font-weight: 600;
         margin: 0;
         background: linear-gradient(to right, #60a5fa, #a78bfa);
+        background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
@@ -67,6 +68,36 @@
         padding: 1rem 2rem;
         background: rgba(15, 23, 42, 0.4);
         border-bottom: 1px solid var(--border);
+      }
+      .api-key-control {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1 1 280px;
+        min-width: 0;
+      }
+      .api-key-control label {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        white-space: nowrap;
+      }
+      #apiKeyInput {
+        flex: 1;
+        min-width: 0;
+        padding: 0.65rem 0.9rem;
+        font-size: 0.95rem;
+        color: var(--text);
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        outline: none;
+      }
+      #apiKeyInput::placeholder {
+        color: #64748b;
+      }
+      #apiKeyInput:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
       }
       button {
         padding: 0.6rem 1.5rem;
@@ -94,15 +125,9 @@
         background: var(--danger-hover);
       }
       @keyframes pulse {
-        0% {
-          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-        }
-        70% {
-          box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-        }
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
       }
       .loading {
         display: none;
@@ -170,9 +195,7 @@
         animation: spin 0.9s linear infinite;
       }
       @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
+        to { transform: rotate(360deg); }
       }
       .status {
         color: #fca5a5;
@@ -196,22 +219,16 @@
       #transcript p {
         margin-bottom: 1rem;
         padding: 1rem;
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255,255,255,0.03);
         border-radius: 8px;
         border-left: 3px solid var(--primary);
         animation: fadeIn 0.3s ease-in-out;
       }
       @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
-
+      
       /* Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
@@ -282,10 +299,21 @@
           <span id="loadingText">Loading...</span>
         </div>
       </div>
-
+      
       <div class="toolbar">
         <button id="btnStart">🎤 Bắt đầu nghe</button>
 
+        <div class="api-key-control">
+          <label for="apiKeyInput">API key:</label>
+          <input
+            id="apiKeyInput"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Nhập API key trước khi dùng"
+          />
+        </div>
+        
         <div id="progressWrapper" class="progress-wrapper">
           <progress id="chunkProgress" value="0" max="8000"></progress>
           <span id="countdownText">8s</span>
@@ -315,14 +343,13 @@
       const statusDiv = document.getElementById("status");
       const loadingDiv = document.getElementById("loading");
       const loadingText = document.getElementById("loadingText");
+      const apiKeyInput = document.getElementById("apiKeyInput");
       const fontSizeRange = document.getElementById("fontSizeRange");
       const fontSizeValue = document.getElementById("fontSizeValue");
       const progressWrapper = document.getElementById("progressWrapper");
       const chunkProgress = document.getElementById("chunkProgress");
       const countdownText = document.getElementById("countdownText");
-      const FIRST = "gsk_Vfgy9cP7YFxPn0e5BImzWG";
-      const SECOND = "dyb3FYUSQoqxhVe5RBZlWrF2mEa1Iu";
-      const API_KEY = `${FIRST}${SECOND}`;
+      const API_KEY_STORAGE_KEY = "tts_api_key";
       const FONT_SIZE_STORAGE_KEY = "stt_transcript_font_size";
 
       let recorder;
@@ -340,6 +367,7 @@
       const VAD_MIN_CONSECUTIVE_FRAMES = 3;
 
       initFontSizeControl();
+      initApiKeyControl();
       setupKeyboardShortcuts();
 
       btnStart.onclick = toggleListening;
@@ -347,6 +375,13 @@
       async function toggleListening() {
         if (isListening) {
           stopListening();
+          return;
+        }
+
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          statusDiv.innerText = "Nhập API key trước khi bắt đầu nghe.";
+          apiKeyInput.focus();
           return;
         }
 
@@ -407,7 +442,7 @@
           setLoading(true, "Listening...");
           btnStart.innerText = "🛑 Dừng nghe";
           btnStart.classList.add("recording");
-
+          
           startProgressTimer();
         } catch (err) {
           console.error("Không bật được micro:", err);
@@ -481,6 +516,24 @@
           applyTranscriptFontSize(value);
           localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(value));
         });
+      }
+
+      function initApiKeyControl() {
+        const savedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+        apiKeyInput.value = savedApiKey;
+
+        apiKeyInput.addEventListener("input", () => {
+          const value = apiKeyInput.value.trim();
+          if (value) {
+            localStorage.setItem(API_KEY_STORAGE_KEY, value);
+          } else {
+            localStorage.removeItem(API_KEY_STORAGE_KEY);
+          }
+        });
+      }
+
+      function getApiKey() {
+        return apiKeyInput.value.trim() || localStorage.getItem(API_KEY_STORAGE_KEY) || "";
       }
 
       function setupKeyboardShortcuts() {
@@ -625,16 +678,21 @@
       let previousTranscript = ""; // Lưu lại ngữ cảnh text của đoạn trước đó
 
       async function sendToGroq(audioBlob) {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          statusDiv.innerText = "Thiếu API key, hãy nhập key trước khi gửi âm thanh.";
+          stopListening(true);
+          return;
+        }
+
         const formData = new FormData();
         formData.append("file", audioBlob, "speech.wav");
         formData.append("model", "whisper-large-v3");
         formData.append("language", "vi");
-
+        
         // Nối thêm text vừa nói ở đoạn trước vào prompt để AI giữ ngữ cảnh
         const basePrompt = "Bài giảng nhiếp ảnh";
-        const fullPrompt = previousTranscript
-          ? basePrompt + " " + previousTranscript
-          : basePrompt;
+        const fullPrompt = previousTranscript ? basePrompt + " " + previousTranscript : basePrompt;
         formData.append("prompt", fullPrompt);
 
         try {
@@ -642,7 +700,7 @@
             "https://api.groq.com/openai/v1/audio/transcriptions",
             {
               method: "POST",
-              headers: { Authorization: `Bearer ${API_KEY}` },
+              headers: { Authorization: `Bearer ${apiKey}` },
               body: formData,
             },
           );
@@ -665,7 +723,7 @@
               p.innerText = "➤ " + data.text;
               transcriptDiv.appendChild(p);
               transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-
+              
               // Cập nhật lại previousTranscript cho chunk tiếp theo (giữ khoảng 200 ký tự cuối)
               previousTranscript = data.text.slice(-200);
             } else {
